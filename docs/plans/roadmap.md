@@ -17,17 +17,24 @@ Status: vision drafted.
 
 Plan: `docs/plans/v0.01-plan.md`
 
-Status: planned.
+Status: in progress. Milestones 1 and 2 are complete and tested.
 
 Summary:
 
-- Clean the formatter/precommit baseline.
-- Introduce a signal-first runtime boundary.
+- Clean the formatter/precommit baseline. Complete.
+- Introduce a signal-first runtime boundary. Complete.
 - Add the first primary intent agent.
 - Add explicit Jido actions and a permission gate.
 - Add markdown memory v0.
 - Record traces and basic cost/diagnostic metadata.
 - Expose the same loop through CLI/REPL and Phoenix LiveView.
+
+Current operator loop:
+
+- `AllbertAssist.Runtime.submit_user_input/1` accepts local user input and
+  emits `allbert.input.received` / `allbert.agent.responded` log signals.
+- The `/agent` LiveView uses the same runtime boundary and displays the
+  response, status, and signal id.
 
 Exit signal: Allbert can remember something, recall recent memory, explain or
 select a safe action, and leave an inspectable trace from both CLI and web UI.
@@ -88,4 +95,3 @@ Expected direction:
 - Explore scripting or self-modification only after the action permission model
   is robust.
 - Keep all self-improvement paths reviewable, reversible, and traceable.
-
