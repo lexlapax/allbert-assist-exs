@@ -57,7 +57,7 @@ defmodule AllbertAssist.Agents.IntentAgent do
   selection into the supervised agent loop after permissions, memory, and
   traces are stronger.
   """
-  @spec respond(%{required(:text) => String.t()}) :: {:ok, map()} | {:error, term()}
+  @spec respond(map()) :: {:ok, map()} | {:error, term()}
   def respond(%{text: text} = request) when is_binary(text) do
     text = String.trim(text)
     context = %{request: request, agent: __MODULE__}
