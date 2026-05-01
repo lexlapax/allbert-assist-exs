@@ -1,0 +1,87 @@
+defmodule Mix.Tasks.Allbert.AskTest do
+  use ExUnit.Case, async: false
+
+  import ExUnit.CaptureIO
+
+  alias AllbertAssist.Memory
+  alias AllbertAssist.Runtime
+  alias AllbertAssist.Trace
+  alias Mix.Tasks.Allbert.Ask
+
+  setup do
+    original_runtime_config = Application.get_env(:allbert_assist, Runtime)
+    original_memory_config = Application.get_env(:allbert_assist, Memory)
+    original_trace_config = Application.get_env(:allbert_assist, Trace)
+
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "allbert-ask-task-test-#{System.unique_integer([:positive])}"
+      )
+
+    runner = fn _signal, request ->
+      {:ok,
+       %{
+         message: "CLI response: #{request.text}",
+         status: :completed,
+         actions: [
+           %{
+             name: "direct_answer",
+             status: :completed,
+             permission_decision: %{decision: :allowed}
+           }
+         ]
+       }}
+    end
+
+    Application.put_env(:allbert_assist, Runtime, agent_runner: runner)
+    Application.put_env(:allbert_assist, Memory, root: root)
+    Application.delete_env(:allbert_assist, Trace)
+
+    on_exit(fn ->
+      restore_env(Runtime, original_runtime_config)
+      restore_env(Memory, original_memory_config)
+      restore_env(Trace, original_trace_config)
+      Mix.Task.reenable("allbert.ask")
+      File.rm_rf!(root)
+    end)
+
+    {:ok, root: root}
+  end
+
+  test "prints a runtime response for one prompt" do
+    output =
+      capture_io(fn ->
+        assert :ok = Ask.run(["hello from cli"])
+      end)
+
+    assert output =~ "Status: completed"
+    assert output =~ "CLI response: hello from cli"
+    assert output =~ "Signal: "
+    assert output =~ "Trace: none"
+    assert output =~ "Actions:"
+    assert output =~ "- direct_answer (completed)"
+  end
+
+  test "can enable trace recording for a CLI turn", %{root: root} do
+    output =
+      capture_io(fn ->
+        assert :ok = Ask.run(["--trace", "trace this cli prompt"])
+      end)
+
+    assert output =~ "Status: completed"
+    assert output =~ "Trace: #{Path.join(root, "traces")}"
+
+    [trace_path] = Path.wildcard(Path.join([root, "traces", "*.md"]))
+    assert File.read!(trace_path) =~ "trace this cli prompt"
+  end
+
+  test "raises when prompt is missing" do
+    assert_raise Mix.Error, ~r/Usage: mix allbert.ask/, fn ->
+      Ask.run([])
+    end
+  end
+
+  defp restore_env(module, nil), do: Application.delete_env(:allbert_assist, module)
+  defp restore_env(module, config), do: Application.put_env(:allbert_assist, module, config)
+end

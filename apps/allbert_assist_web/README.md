@@ -1,18 +1,17 @@
 # AllbertAssistWeb
 
-To start your Phoenix server:
+Phoenix web surface for Allbert Assist.
 
-* Run `mix setup` to install and setup dependencies
-* Start Phoenix endpoint with `mix phx.server`
+Start the web demo:
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+```sh
+export ALLBERT_MEMORY_ROOT=/tmp/allbert-v001-demo
+export ALLBERT_TRACE_ENABLED=true
+mix phx.server
+```
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+Open `http://localhost:4000/agent`.
 
-## Learn more
-
-* Official website: https://www.phoenixframework.org/
-* Guides: https://hexdocs.pm/phoenix/overview.html
-* Docs: https://hexdocs.pm/phoenix
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix
+The `/agent` LiveView uses the same `AllbertAssist.Runtime.submit_user_input/1`
+boundary as the CLI and displays response status, signal id, and trace path
+when tracing is enabled.

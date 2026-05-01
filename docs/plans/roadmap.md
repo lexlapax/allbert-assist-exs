@@ -18,10 +18,9 @@ Status: vision drafted.
 Plan: `docs/plans/v0.01-plan.md`
 Request flow: `docs/plans/v0.01-request-flow.md`
 
-Status: in progress. Milestones 1 and 2 are complete and tested; Milestone 3
-is complete, tested, and operator-verified; Milestone 4 is complete, tested,
-and operator-verified; Milestone 5 is complete and tested. Milestone 5.1 is
-complete and tested. Milestone 6 is complete and tested.
+Status: complete. Milestones 1 and 2 are complete and tested; Milestone 3 is
+complete, tested, and operator-verified; Milestone 4 is complete, tested, and
+operator-verified; Milestones 5, 5.1, 6, and 7 are complete and tested.
 
 Summary:
 
@@ -32,7 +31,7 @@ Summary:
 - Add markdown memory v0. Complete.
 - Add deterministic personal preference heuristics. Complete.
 - Record traces and basic cost/diagnostic metadata. Complete.
-- Expose the same loop through CLI/REPL and Phoenix LiveView.
+- Expose the same loop through CLI/REPL and Phoenix LiveView. Complete.
 
 Current operator loop:
 
@@ -52,11 +51,15 @@ Current operator loop:
   conservative heuristics.
 - When tracing is enabled, runtime turns write inspectable markdown traces under
   the memory `traces` category and return the trace path in `response.trace_id`.
+- `mix allbert.ask` provides the first terminal entrypoint over the same runtime
+  core.
 - The `/agent` LiveView uses the same runtime boundary and displays the
   response, status, signal id, and trace path when available.
 
 Exit signal: Allbert can remember something, recall recent memory, explain or
 select a safe action, and leave an inspectable trace from both CLI and web UI.
+
+Next milestone candidate: v0.02 Skill Registry.
 
 ## v0.02: Skill Registry
 

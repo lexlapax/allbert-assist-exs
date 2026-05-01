@@ -72,4 +72,36 @@ defmodule AllbertAssist.MemoryTest do
     assert body =~ "planning docs"
     assert summary =~ "planning docs"
   end
+
+  test "recent memory excludes trace entries unless requested" do
+    assert {:ok, _trace} =
+             Memory.append(%{
+               category: :traces,
+               body: "Trace for a concise milestone handoff memory write.",
+               source_signal_id: "sig-trace",
+               actor: "local",
+               agent: "AllbertAssist.Runtime",
+               channel: :test
+             })
+
+    assert {:ok, _preference} =
+             Memory.append(%{
+               category: :preferences,
+               body: "I like concise milestone handoffs.",
+               source_signal_id: "sig-pref",
+               actor: "local",
+               agent: "AllbertAssist.Agents.IntentAgent",
+               channel: :test
+             })
+
+    assert {:ok, entries} = Memory.recent(query: "milestone handoffs")
+
+    assert Enum.all?(entries, &(&1.category != :traces))
+    assert [%{category: :preferences}] = entries
+
+    assert {:ok, trace_entries} =
+             Memory.recent(query: "milestone handoffs", categories: [:traces])
+
+    assert [%{category: :traces}] = trace_entries
+  end
 end

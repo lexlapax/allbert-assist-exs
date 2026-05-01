@@ -7,6 +7,7 @@ defmodule AllbertAssist.Memory do
   """
 
   @categories [:notes, :preferences, :traces, :skills]
+  @recall_categories [:notes, :preferences, :skills]
   @default_limit 5
 
   @type category :: :notes | :preferences | :traces | :skills
@@ -79,10 +80,11 @@ defmodule AllbertAssist.Memory do
   def recent(opts \\ []) when is_list(opts) do
     limit = Keyword.get(opts, :limit, @default_limit)
     query = Keyword.get(opts, :query, "")
+    categories = Keyword.get(opts, :categories, @recall_categories)
 
     entries =
       ensure_root!()
-      |> memory_files()
+      |> memory_files(categories)
       |> Enum.flat_map(&read_entry/1)
       |> rank_entries(query)
       |> Enum.take(limit)
@@ -170,8 +172,9 @@ defmodule AllbertAssist.Memory do
     |> Path.join(filename)
   end
 
-  defp memory_files(root) do
-    @categories
+  defp memory_files(root, categories) do
+    categories
+    |> Enum.filter(&(&1 in @categories))
     |> Enum.flat_map(fn category ->
       root
       |> Path.join(Atom.to_string(category))
