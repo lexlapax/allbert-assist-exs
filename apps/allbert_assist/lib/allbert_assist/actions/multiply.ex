@@ -1,7 +1,6 @@
 defmodule AllbertAssist.Actions.Multiply do
   @moduledoc """
-  Sample Jido action: multiplies two integers. Wired into `SampleAgent`
-  as a tool the LLM can call.
+  Sample Jido action: multiplies two integers.
   """
   use Jido.Action,
     name: "multiply",

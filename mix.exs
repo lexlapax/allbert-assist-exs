@@ -32,6 +32,8 @@ defmodule AllbertAssist.Umbrella.MixProject do
       plt_add_apps: [:mix, :ex_unit],
       plt_core_path: "_build/#{Mix.env()}",
       plt_local_path: "_build/#{Mix.env()}/dialyxir.plt",
+      ignore_warnings: ".dialyzer_ignore.exs",
+      list_unused_filters: true,
       flags: [:error_handling, :missing_return, :extra_return, :underspecs]
     ]
   end

@@ -27,7 +27,6 @@ defmodule AllbertAssist.Security.PermissionGate do
         }
 
   @doc "Return the permission classes recognized in v0.01."
-  @spec permission_classes() :: [permission()]
   def permission_classes, do: @permission_classes
 
   @doc """

@@ -70,7 +70,6 @@ defmodule AllbertAssist.Agents.IntentAgent do
   def respond(_request), do: {:error, :missing_text}
 
   @doc "Return the action modules that define the v0.01 intent surface."
-  @spec action_modules() :: [module()]
   def action_modules do
     [
       DirectAnswer,

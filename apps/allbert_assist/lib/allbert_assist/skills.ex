@@ -60,7 +60,6 @@ defmodule AllbertAssist.Skills do
   ]
 
   @doc "Return all v0.01 skill declarations."
-  @spec list() :: [map()]
   def list, do: @skills
 
   @doc "Find a skill declaration by name or title."

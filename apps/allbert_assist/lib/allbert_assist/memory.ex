@@ -12,18 +12,19 @@ defmodule AllbertAssist.Memory do
   @type category :: :notes | :preferences | :traces | :skills
 
   @type entry :: %{
+          optional(:content) => String.t(),
           path: String.t(),
           category: category(),
           timestamp: String.t(),
           source_signal_id: String.t(),
           actor: String.t(),
           agent: String.t(),
+          channel: String.t(),
           summary: String.t(),
           body: String.t()
         }
 
   @doc "Return supported markdown memory categories."
-  @spec categories() :: [category()]
   def categories, do: @categories
 
   @doc """
@@ -74,7 +75,7 @@ defmodule AllbertAssist.Memory do
   def append(_attrs), do: {:error, :invalid_memory_attrs}
 
   @doc "Read recent markdown memory entries, optionally ranked by query terms."
-  @spec recent(keyword()) :: {:ok, [entry()]} | {:error, term()}
+  @spec recent(keyword()) :: {:ok, [entry()]}
   def recent(opts \\ []) when is_list(opts) do
     limit = Keyword.get(opts, :limit, @default_limit)
     query = Keyword.get(opts, :query, "")
