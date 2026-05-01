@@ -1,0 +1,16 @@
+{
+  "skip_files": [
+    "apps/.*/test/.*",
+    "apps/.*_web/lib/.*_web/telemetry.ex",
+    "apps/.*_web/lib/.*_web/components/layouts.ex",
+    "apps/.*_web/lib/.*_web.ex"
+  ],
+  "default_stop_words": [
+    "defmodule",
+    "defstruct"
+  ],
+  "coverage_options": {
+    "treat_no_relevant_lines_as_covered": true,
+    "minimum_coverage": 70
+  }
+}
