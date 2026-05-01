@@ -1,11 +1,37 @@
 defmodule AllbertAssist.Actions.IntentActionsTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias AllbertAssist.Actions.Intent.AppendMemory
   alias AllbertAssist.Actions.Intent.ExternalNetworkRequest
   alias AllbertAssist.Actions.Intent.ListSkills
   alias AllbertAssist.Actions.Intent.PlanShellCommand
+  alias AllbertAssist.Actions.Intent.ReadRecentMemory
   alias AllbertAssist.Actions.Intent.ReadSkill
+  alias AllbertAssist.Memory
+
+  setup do
+    original_config = Application.get_env(:allbert_assist, Memory)
+
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "allbert-action-memory-test-#{System.unique_integer([:positive])}"
+      )
+
+    Application.put_env(:allbert_assist, Memory, root: root)
+
+    on_exit(fn ->
+      if original_config do
+        Application.put_env(:allbert_assist, Memory, original_config)
+      else
+        Application.delete_env(:allbert_assist, Memory)
+      end
+
+      File.rm_rf!(root)
+    end)
+
+    {:ok, root: root}
+  end
 
   test "list_skills returns static readable declarations" do
     assert {:ok, response} = ListSkills.run(%{}, %{})
@@ -25,21 +51,48 @@ defmodule AllbertAssist.Actions.IntentActionsTest do
     assert response.permission_decision.decision == :allowed
   end
 
-  test "append_memory selects a non-durable memory write" do
+  test "append_memory writes durable markdown", %{root: root} do
     assert {:ok, response} =
-             AppendMemory.run(%{memory: "I prefer short implementation updates."}, %{})
+             AppendMemory.run(
+               %{memory: "I prefer short implementation updates."},
+               %{request: %{input_signal_id: "sig-123", operator_id: "local", channel: :test}}
+             )
 
     assert response.status == :completed
-    assert response.message =~ "Selected action: append_memory"
+    assert response.message =~ "Saved markdown memory"
     assert response.permission_decision.decision == :allowed
+    assert response.memory.path =~ Path.join(root, "preferences")
+    assert File.exists?(response.memory.path)
 
     assert [
              %{
-               durable: false,
-               milestone: "v0.01 M5",
+               durable: true,
+               memory_path: memory_path,
+               memory_category: :preferences,
                permission_decision: %{decision: :allowed}
              }
            ] = response.actions
+
+    assert memory_path == response.memory.path
+  end
+
+  test "read_recent_memory returns markdown-backed entries" do
+    assert {:ok, _response} =
+             AppendMemory.run(
+               %{memory: "My planning docs should be implementation-ready."},
+               %{request: %{input_signal_id: "sig-123", operator_id: "local", channel: :test}}
+             )
+
+    assert {:ok, response} =
+             ReadRecentMemory.run(
+               %{query: "What do you remember about my planning docs?"},
+               %{}
+             )
+
+    assert response.status == :completed
+    assert response.message =~ "markdown-backed memories"
+    assert [%{body: body}] = response.memories
+    assert body =~ "planning docs"
   end
 
   test "plan_shell_command never executes requested command" do

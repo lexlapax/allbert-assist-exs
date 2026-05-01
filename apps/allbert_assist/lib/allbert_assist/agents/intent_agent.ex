@@ -33,8 +33,8 @@ defmodule AllbertAssist.Agents.IntentAgent do
     Current boundaries:
     - You may answer directly.
     - You may list or read v0.01 skill declarations.
-    - You may select memory append/read actions, but durable markdown memory is
-      not implemented until M5.
+    - You may append and read markdown-backed memory for explicit memory
+      requests.
     - You may plan shell commands, but you must not claim to execute them.
     - You may recognize external-network requests, but you must not make them.
     - Sensitive or destructive work must be refused or marked for future
@@ -69,7 +69,7 @@ defmodule AllbertAssist.Agents.IntentAgent do
 
   def respond(_request), do: {:error, :missing_text}
 
-  @doc "Return the action modules that define the v0.01 M3 intent surface."
+  @doc "Return the action modules that define the v0.01 intent surface."
   @spec action_modules() :: [module()]
   def action_modules do
     [

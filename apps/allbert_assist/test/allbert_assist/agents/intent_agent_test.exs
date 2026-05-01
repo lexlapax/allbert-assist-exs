@@ -1,7 +1,32 @@
 defmodule AllbertAssist.Agents.IntentAgentTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias AllbertAssist.Agents.IntentAgent
+  alias AllbertAssist.Memory
+
+  setup do
+    original_config = Application.get_env(:allbert_assist, Memory)
+
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "allbert-intent-memory-test-#{System.unique_integer([:positive])}"
+      )
+
+    Application.put_env(:allbert_assist, Memory, root: root)
+
+    on_exit(fn ->
+      if original_config do
+        Application.put_env(:allbert_assist, Memory, original_config)
+      else
+        Application.delete_env(:allbert_assist, Memory)
+      end
+
+      File.rm_rf!(root)
+    end)
+
+    {:ok, root: root}
+  end
 
   test "defines the v0.01 action surface as Jido action modules" do
     action_names = Enum.map(IntentAgent.action_modules(), & &1.name())
@@ -66,26 +91,52 @@ defmodule AllbertAssist.Agents.IntentAgentTest do
            ] = response.actions
   end
 
-  test "selects append_memory for explicit memory requests without persistence" do
+  test "writes markdown memory for explicit memory requests", %{root: root} do
     assert {:ok, response} =
              IntentAgent.respond(%{
                text: "Remember that I prefer short implementation updates.",
                channel: :test,
-               operator_id: "local"
+               operator_id: "local",
+               input_signal_id: "sig-123"
              })
 
     assert response.status == :completed
-    assert response.message =~ "Selected action: append_memory"
+    assert response.message =~ "Saved markdown memory"
     assert response.message =~ "I prefer short implementation updates."
+    assert response.memory.path =~ Path.join(root, "preferences")
+    assert File.exists?(response.memory.path)
 
     assert [
              %{
                name: "append_memory",
-               status: :selected,
-               durable: false,
+               status: :completed,
+               durable: true,
                permission_decision: %{decision: :allowed}
              }
            ] = response.actions
+  end
+
+  test "reads markdown memory for recall requests" do
+    assert {:ok, _response} =
+             IntentAgent.respond(%{
+               text: "Remember that my planning docs should be implementation-ready.",
+               channel: :test,
+               operator_id: "local",
+               input_signal_id: "sig-123"
+             })
+
+    assert {:ok, response} =
+             IntentAgent.respond(%{
+               text: "What do you remember about my planning docs?",
+               channel: :test,
+               operator_id: "local",
+               input_signal_id: "sig-456"
+             })
+
+    assert response.status == :completed
+    assert response.message =~ "markdown-backed memories"
+    assert response.message =~ "planning docs should be implementation-ready"
+    assert [%{name: "read_recent_memory", memory_count: 1}] = response.actions
   end
 
   test "refuses command execution while offering only the plan action" do

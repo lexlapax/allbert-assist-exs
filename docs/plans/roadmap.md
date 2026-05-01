@@ -20,7 +20,7 @@ Request flow: `docs/plans/v0.01-request-flow.md`
 
 Status: in progress. Milestones 1 and 2 are complete and tested; Milestone 3
 is complete, tested, and operator-verified; Milestone 4 is complete, tested,
-and operator-verified.
+and operator-verified; Milestone 5 is complete and tested.
 
 Summary:
 
@@ -28,7 +28,7 @@ Summary:
 - Introduce a signal-first runtime boundary. Complete.
 - Add the first primary intent agent. Complete.
 - Add explicit Jido actions and a permission gate. Complete.
-- Add markdown memory v0.
+- Add markdown memory v0. Complete.
 - Record traces and basic cost/diagnostic metadata.
 - Expose the same loop through CLI/REPL and Phoenix LiveView.
 
@@ -42,6 +42,9 @@ Current operator loop:
 - `AllbertAssist.Security.PermissionGate` records explicit permission decisions
   for read-only work, memory-write intent, command planning, blocked command
   execution, and external network confirmation.
+- `AllbertAssist.Memory` stores explicit memories as user-readable markdown
+  under `ALLBERT_MEMORY_ROOT` or `var/allbert/memory`, and recall prompts read
+  the same markdown source of truth.
 - The `/agent` LiveView uses the same runtime boundary and displays the
   response, status, and signal id.
 

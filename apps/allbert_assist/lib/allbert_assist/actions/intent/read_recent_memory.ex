@@ -1,14 +1,13 @@
 defmodule AllbertAssist.Actions.Intent.ReadRecentMemory do
   @moduledoc """
-  Selects the future markdown recent-memory read capability.
+  Reads recent markdown-backed memory entries.
   """
 
   use Jido.Action,
     name: "read_recent_memory",
-    description:
-      "Prepare a recent-memory read against the markdown-backed memory store planned in M5.",
+    description: "Read recent entries from the markdown-backed memory store.",
     category: "intent",
-    tags: ["intent", "memory", "read_only", "planned"],
+    tags: ["intent", "memory", "read_only", "durable"],
     schema: [
       query: [type: :string, required: true, doc: "The memory recall question."]
     ],
@@ -16,39 +15,61 @@ defmodule AllbertAssist.Actions.Intent.ReadRecentMemory do
       message: [type: :string, required: true],
       status: [type: :atom, required: true],
       permission_decision: [type: :map, required: true],
+      memories: [type: {:list, :map}, required: true],
       actions: [type: {:list, :map}, required: true]
     ]
 
+  alias AllbertAssist.Memory
   alias AllbertAssist.Security.PermissionGate
 
   @impl true
   def run(%{query: query}, context) do
     permission_decision = PermissionGate.authorize(:read_only, context)
+    {:ok, entries} = Memory.recent(query: query, limit: 5)
 
     {:ok,
      %{
-       message: message(),
+       message: message(entries),
        status: PermissionGate.response_status(permission_decision),
        permission_decision: permission_decision,
+       memories: entries,
        actions: [
          %{
            name: "read_recent_memory",
-           status: :selected,
+           status: :completed,
            permission: :read_only,
            permission_decision: permission_decision,
-           durable_source_ready: false,
-           milestone: "v0.01 M5",
+           durable_source_ready: true,
+           memory_count: length(entries),
            input: %{query: query}
          }
        ]
      }}
   end
 
-  defp message do
+  defp message([]) do
     """
     Selected action: read_recent_memory.
 
-    The markdown memory source is not implemented until M5, so there is no durable memory to read yet.
+    I did not find markdown memory entries for that request yet.
+    """
+    |> String.trim()
+  end
+
+  defp message(entries) do
+    memory_lines =
+      entries
+      |> Enum.map(fn entry ->
+        "- #{entry.summary} (#{entry.category}, #{entry.timestamp})\n  #{entry.path}"
+      end)
+      |> Enum.join("\n")
+
+    """
+    Selected action: read_recent_memory.
+
+    I found these markdown-backed memories:
+
+    #{memory_lines}
     """
     |> String.trim()
   end

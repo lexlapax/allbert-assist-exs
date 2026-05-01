@@ -163,7 +163,14 @@ defmodule AllbertAssist.Runtime do
     |> Keyword.get(:agent_runner, &run_intent_agent/2)
   end
 
-  defp run_intent_agent(_signal, request), do: IntentAgent.respond(request)
+  defp run_intent_agent(signal, request) do
+    request =
+      request
+      |> Map.put(:input_signal_id, signal.id)
+      |> Map.put(:input_signal_type, signal.type)
+
+    IntentAgent.respond(request)
+  end
 
   defp format_agent_result(%{message: message}) when is_binary(message), do: message
   defp format_agent_result(%{content: content}) when is_binary(content), do: content

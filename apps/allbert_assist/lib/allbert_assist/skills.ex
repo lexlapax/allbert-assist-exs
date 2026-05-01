@@ -16,19 +16,17 @@ defmodule AllbertAssist.Skills do
     },
     %{
       name: "append_memory",
-      title: "Prepare Memory Append",
-      description:
-        "Recognize a user memory request and prepare the markdown memory write planned for M5.",
+      title: "Append Memory",
+      description: "Save explicit user memory requests as durable markdown.",
       permission: :memory_write,
-      status: :planned
+      status: :available
     },
     %{
       name: "read_recent_memory",
-      title: "Prepare Recent Memory Read",
-      description:
-        "Recognize a memory recall request and describe the markdown-backed read planned for M5.",
+      title: "Read Recent Memory",
+      description: "Read recent markdown-backed memory entries.",
       permission: :read_only,
-      status: :planned
+      status: :available
     },
     %{
       name: "list_skills",

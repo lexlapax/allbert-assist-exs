@@ -55,7 +55,7 @@ defmodule AllbertAssist.Actions.Intent.ListSkills do
 
     #{skill_lines}
 
-    I cannot execute shell commands, call external services, or persist durable memory in M3.
+    I cannot execute shell commands or call external services. Durable markdown memory is available for explicit remember/recall requests.
     """
     |> String.trim()
   end
