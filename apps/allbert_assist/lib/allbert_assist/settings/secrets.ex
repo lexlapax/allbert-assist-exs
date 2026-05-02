@@ -3,6 +3,7 @@ defmodule AllbertAssist.Settings.Secrets do
   Encrypted local secret store for user-supplied Settings Central credentials.
   """
 
+  alias AllbertAssist.Settings.Audit
   alias AllbertAssist.Settings.Schema
   alias AllbertAssist.Settings.Store
   alias AllbertAssist.Settings.YamlCodec
@@ -20,14 +21,20 @@ defmodule AllbertAssist.Settings.Secrets do
 
   def put_secret(secret_ref, value, context) when is_binary(value) do
     with :ok <- validate_secret_ref(secret_ref),
+         old_status <- status(secret_ref),
          {:ok, key} <- master_key(),
          {:ok, plaintext} <- read_plaintext(key),
          updated_plaintext <- put_plaintext_secret(plaintext, secret_ref, value, context),
          :ok <- write_plaintext(key, updated_plaintext),
          {:ok, provider} <- provider_from_ref(secret_ref),
          {:ok, _resolved} <-
-           AllbertAssist.Settings.put("providers.#{provider}.api_key_ref", secret_ref, context) do
-      {:ok, %{secret_ref: secret_ref, status: :configured}}
+           AllbertAssist.Settings.put(
+             "providers.#{provider}.api_key_ref",
+             secret_ref,
+             Map.put(context, :audit?, false)
+           ) do
+      diagnostics = audit_secret(secret_ref, old_status, :configured, context)
+      {:ok, %{secret_ref: secret_ref, status: :configured, diagnostics: diagnostics}}
     end
   end
 
@@ -65,6 +72,13 @@ defmodule AllbertAssist.Settings.Secrets do
          updated <- delete_plaintext_secret(plaintext, secret_ref),
          :ok <- write_plaintext(key, updated) do
       {:ok, %{secret_ref: secret_ref, status: :missing}}
+    end
+  end
+
+  defp audit_secret(secret_ref, old_status, new_status, context) do
+    case Audit.append_secret(secret_ref, old_status, new_status, context) do
+      {:ok, path} -> [%{source: :settings_audit, audit_path: path}]
+      {:error, reason} -> [%{source: :settings_audit, error: inspect(reason)}]
     end
   end
 

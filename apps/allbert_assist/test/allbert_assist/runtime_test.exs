@@ -5,11 +5,13 @@ defmodule AllbertAssist.RuntimeTest do
 
   alias AllbertAssist.Memory
   alias AllbertAssist.Runtime
+  alias AllbertAssist.Settings
   alias AllbertAssist.Trace
 
   setup do
     original_config = Application.get_env(:allbert_assist, Runtime)
     original_memory_config = Application.get_env(:allbert_assist, Memory)
+    original_settings_config = Application.get_env(:allbert_assist, Settings)
     original_trace_config = Application.get_env(:allbert_assist, Trace)
     original_logger_level = Logger.level()
     parent = self()
@@ -38,6 +40,7 @@ defmodule AllbertAssist.RuntimeTest do
 
     Application.put_env(:allbert_assist, Runtime, agent_runner: runner)
     Application.put_env(:allbert_assist, Memory, root: root)
+    Application.put_env(:allbert_assist, Settings, root: Path.join(root, "settings"))
     Application.delete_env(:allbert_assist, Trace)
     Logger.configure(level: :info)
 
@@ -54,6 +57,12 @@ defmodule AllbertAssist.RuntimeTest do
         Application.put_env(:allbert_assist, Memory, original_memory_config)
       else
         Application.delete_env(:allbert_assist, Memory)
+      end
+
+      if original_settings_config do
+        Application.put_env(:allbert_assist, Settings, original_settings_config)
+      else
+        Application.delete_env(:allbert_assist, Settings)
       end
 
       if original_trace_config do
@@ -204,6 +213,50 @@ defmodule AllbertAssist.RuntimeTest do
     assert trace =~ "requested_permission_decision"
     assert trace =~ "decision: :denied"
     refute trace =~ "command output"
+  end
+
+  test "records traces when runtime.trace_default is enabled in settings", %{root: root} do
+    assert {:ok, _resolved} =
+             Settings.put("runtime.trace_default", "enabled", %{actor: "local", channel: :test})
+
+    assert {:ok, response} =
+             Runtime.submit_user_input(%{
+               text: "Trace through settings.",
+               channel: :test,
+               operator_id: "local"
+             })
+
+    assert response.trace_id =~ Path.join(root, "traces")
+    assert File.exists?(response.trace_id)
+  end
+
+  test "denied_only trace default records denied turns only", %{root: root} do
+    runner = fn _signal, _request ->
+      {:ok,
+       %{
+         message: "Denied.",
+         status: :denied,
+         actions: [%{name: "plan_shell_command", permission_decision: %{decision: :denied}}]
+       }}
+    end
+
+    Application.put_env(:allbert_assist, Runtime, agent_runner: runner)
+
+    assert {:ok, _resolved} =
+             Settings.put("runtime.trace_default", "denied_only", %{
+               actor: "local",
+               channel: :test
+             })
+
+    assert {:ok, response} =
+             Runtime.submit_user_input(%{
+               text: "Run rm -rf /tmp/example",
+               channel: :test,
+               operator_id: "local"
+             })
+
+    assert response.status == :denied
+    assert response.trace_id =~ Path.join(root, "traces")
   end
 
   test "documents the first runtime signal names" do

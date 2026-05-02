@@ -38,9 +38,14 @@ defmodule AllbertAssist.Settings do
   end
 
   def put(key, value, context \\ %{}) when is_binary(key) do
-    with {:ok, settings, user_settings} <- Store.put_user_setting(key, value) do
+    with {:ok, settings, user_settings, diagnostics} <-
+           Store.put_user_setting(key, value, context) do
       resolved = resolved_setting(key, Schema.get_dotted(settings, key), settings, user_settings)
-      {:ok, Map.put(resolved, :context, sanitize_context(context))}
+
+      {:ok,
+       resolved
+       |> Map.put(:context, sanitize_context(context))
+       |> Map.put(:diagnostics, diagnostics)}
     end
   end
 

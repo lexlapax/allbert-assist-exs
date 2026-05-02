@@ -15,14 +15,14 @@ defmodule AllbertAssist.Trace do
 
   @doc "Return true when runtime trace recording is enabled."
   @spec enabled?() :: boolean()
-  def enabled? do
-    config_enabled?() || env_enabled?()
+  def enabled?(turn \\ %{}) do
+    request_trace_enabled?(turn) || env_enabled?() || config_enabled?() || settings_enabled?(turn)
   end
 
   @doc "Record one runtime turn as markdown when tracing is enabled."
   @spec record_turn(map()) :: result()
   def record_turn(turn) when is_map(turn) do
-    if enabled?() do
+    if enabled?(turn) do
       do_record_turn(turn)
     else
       {:disabled, :tracing_disabled}
@@ -55,6 +55,34 @@ defmodule AllbertAssist.Trace do
 
   defp env_enabled? do
     System.get_env("ALLBERT_TRACE_ENABLED") in ["1", "true", "TRUE", "yes", "YES", "on", "ON"]
+  end
+
+  defp request_trace_enabled?(turn) do
+    request = Map.get(turn, :request, %{})
+    metadata = Map.get(request, :metadata, %{})
+
+    Map.get(request, :trace) in [true, "true", "1"] ||
+      Map.get(metadata, :trace) in [true, "true", "1"] ||
+      Map.get(metadata, "trace") in [true, "true", "1"]
+  end
+
+  defp settings_enabled?(turn) do
+    case AllbertAssist.Settings.get("runtime.trace_default") do
+      {:ok, "enabled"} -> true
+      {:ok, "denied_only"} -> denied_or_confirmation?(turn)
+      _other -> false
+    end
+  rescue
+    _exception -> false
+  end
+
+  defp denied_or_confirmation?(turn) do
+    status =
+      turn
+      |> Map.get(:response, %{})
+      |> Map.get(:status)
+
+    status in [:denied, :needs_confirmation]
   end
 
   defp trace_attrs(turn) do
@@ -106,6 +134,7 @@ defmodule AllbertAssist.Trace do
     - Status: #{response.status}
     - Selected action: #{selected_action(response.actions)}
     - Permission decision: #{permission_decision(response.actions)}
+    - Settings metadata: #{settings_metadata(response.actions)}
     - Token estimate: #{token_estimate(request.text, response.message)}
     - Cost estimate: unavailable-local-model
 
@@ -152,6 +181,16 @@ defmodule AllbertAssist.Trace do
     |> case do
       %{permission_decision: decision} -> inspect(decision, pretty: true)
       %{"permission_decision" => decision} -> inspect(decision, pretty: true)
+      _action -> "none"
+    end
+  end
+
+  defp settings_metadata(actions) do
+    actions
+    |> List.first()
+    |> case do
+      %{settings_metadata: metadata} -> inspect(metadata, pretty: true)
+      %{"settings_metadata" => metadata} -> inspect(metadata, pretty: true)
       _action -> "none"
     end
   end

@@ -55,11 +55,18 @@ defmodule AllbertAssist.SettingsTest do
              })
 
     assert resolved.source == :operator
+    assert [%{source: :settings_audit, audit_path: audit_path}] = resolved.diagnostics
     assert {:ok, "detailed"} = Settings.get("operator.communication_style")
+    assert File.exists?(audit_path)
 
     assert {:ok, yaml} = File.read(Path.join([home, "settings", "settings.yml"]))
     assert yaml =~ "communication_style: detailed"
     refute yaml =~ "model_profiles:"
+
+    audit = File.read!(audit_path)
+    assert audit =~ "operator.communication_style"
+    assert audit =~ "old: concise"
+    assert audit =~ "new: detailed"
   end
 
   test "invalid yaml returns a structured parse error", %{home: home} do
@@ -92,7 +99,7 @@ defmodule AllbertAssist.SettingsTest do
   end
 
   test "secret writes encrypt raw value and store only secret ref in settings", %{home: home} do
-    assert {:ok, %{status: :configured}} =
+    assert {:ok, %{status: :configured, diagnostics: [%{audit_path: audit_path}]}} =
              Secrets.put_secret("secret://providers/openai/api_key", "test-key", %{
                actor: "local",
                channel: :test
@@ -110,6 +117,33 @@ defmodule AllbertAssist.SettingsTest do
     assert secrets_yaml =~ "aes-256-gcm"
     refute settings_yaml =~ "test-key"
     refute secrets_yaml =~ "test-key"
+
+    audit = File.read!(audit_path)
+    assert audit =~ "secret://providers/openai/api_key"
+    assert audit =~ "old: missing"
+    assert audit =~ "new: configured"
+    refute audit =~ "test-key"
+  end
+
+  test "audit write failure is returned as a diagnostic" do
+    original_audit_config = Application.get_env(:allbert_assist, AllbertAssist.Settings.Audit)
+
+    Application.put_env(:allbert_assist, AllbertAssist.Settings.Audit,
+      writer: fn _path, _body -> {:error, :disk_full} end
+    )
+
+    on_exit(fn ->
+      restore_app_env(AllbertAssist.Settings.Audit, original_audit_config)
+    end)
+
+    assert {:ok, resolved} =
+             Settings.put("operator.communication_style", "balanced", %{
+               actor: "local",
+               channel: :test
+             })
+
+    assert [%{source: :settings_audit, error: error}] = resolved.diagnostics
+    assert error =~ "disk_full"
   end
 
   test "bad secret refs and corrupt encrypted payloads return structured errors", %{home: home} do

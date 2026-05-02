@@ -2,6 +2,7 @@ defmodule AllbertAssist.Settings.Store do
   @moduledoc false
 
   alias AllbertAssist.Paths
+  alias AllbertAssist.Settings.Audit
   alias AllbertAssist.Settings.Schema
   alias AllbertAssist.Settings.YamlCodec
 
@@ -48,16 +49,18 @@ defmodule AllbertAssist.Settings.Store do
     end
   end
 
-  def put_user_setting(key, value) do
+  def put_user_setting(key, value, context \\ %{}) do
     with {:ok, user_settings} <- read_user_settings(),
          {:ok, merged} <- merge_user_settings(user_settings),
          :ok <- Schema.validate_key_value(key, value, merged) do
+      old_value = Schema.get_dotted(merged, key)
       updated_user_settings = Schema.put_dotted(user_settings, key, value)
       updated_merged = Schema.put_dotted(merged, key, value)
 
       with :ok <- Schema.validate_settings(updated_merged),
            {:ok, _settings} <- write_user_settings(updated_user_settings) do
-        {:ok, updated_merged, updated_user_settings}
+        diagnostics = audit_write(key, old_value, value, context)
+        {:ok, updated_merged, updated_user_settings, diagnostics}
       end
     end
   end
@@ -82,6 +85,16 @@ defmodule AllbertAssist.Settings.Store do
 
   def app_config do
     Application.get_env(@app, AllbertAssist.Settings, [])
+  end
+
+  defp audit_write(_key, _old_value, _value, %{audit?: false}), do: []
+  defp audit_write(_key, _old_value, _value, %{"audit?" => false}), do: []
+
+  defp audit_write(key, old_value, value, context) do
+    case Audit.append_setting(key, old_value, value, context) do
+      {:ok, path} -> [%{source: :settings_audit, audit_path: path}]
+      {:error, reason} -> [%{source: :settings_audit, error: inspect(reason)}]
+    end
   end
 
   defp deep_merge(left, right) when is_map(left) and is_map(right) do
