@@ -125,7 +125,8 @@ network adapters arrive, and no scripting dependency should be added yet.
 Plan: `docs/plans/v0.02-plan.md`
 Request flow: `docs/plans/v0.02-request-flow.md`
 
-Status: planned.
+Status: in progress. Milestone 1 is complete; Milestones 2-7 are
+implementation-ready after the doc hardening pass.
 
 Expected direction:
 
@@ -154,7 +155,7 @@ settings across subsystems.
 
 Plan: `docs/plans/v0.03-plan.md`
 
-Status: placeholder.
+Status: planned.
 
 Expected direction:
 
@@ -199,6 +200,8 @@ still refusing or deferring unsafe execution.
 
 ## v0.05: Confirmation Workflow
 
+Plan: `docs/plans/v0.05-plan.md`
+
 Status: placeholder.
 
 Expected direction:
@@ -213,6 +216,8 @@ Expected direction:
 
 ## v0.06: Scheduled Jobs
 
+Plan: `docs/plans/v0.06-plan.md`
+
 Status: placeholder.
 
 Expected direction:
@@ -224,6 +229,8 @@ Expected direction:
 - Keep scheduled jobs observable through traces and registered skills/actions.
 
 ## v0.07: Additional Channels
+
+Plan: `docs/plans/v0.07-plan.md`
 
 Status: placeholder.
 
@@ -237,6 +244,8 @@ Expected direction:
 - Channels read and update shared settings through the settings engine.
 
 ## v0.08: Memory Review And Retrieval
+
+Plan: `docs/plans/v0.08-plan.md`
 
 Status: placeholder.
 
