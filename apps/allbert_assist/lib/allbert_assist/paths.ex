@@ -1,0 +1,115 @@
+defmodule AllbertAssist.Paths do
+  @moduledoc """
+  Resolves Allbert-owned local runtime paths.
+
+  Allbert Home is the durable local root for settings, secrets, memory,
+  databases, skills, caches, and temporary runtime files. Specific subsystem
+  roots remain available as test, migration, compatibility, and operator escape
+  hatches.
+  """
+
+  @app :allbert_assist
+
+  @doc """
+  Return the canonical Allbert Home.
+
+  Precedence:
+
+  1. `config :allbert_assist, AllbertAssist.Paths, home: "..."`
+  2. `ALLBERT_HOME`
+  3. `ALLBERT_HOME_DIR`
+  4. `~/.allbert`
+  """
+  @spec home() :: String.t()
+  def home do
+    configured(:home) || env_path("ALLBERT_HOME") || env_path("ALLBERT_HOME_DIR") ||
+      Path.expand("~/.allbert")
+  end
+
+  @doc "Create the Allbert Home directory and standard child directories."
+  @spec ensure_home!() :: String.t()
+  def ensure_home! do
+    home = home()
+
+    [
+      home,
+      settings_root(),
+      Path.join(settings_root(), "audit"),
+      memory_root(),
+      Path.join(memory_root(), "notes"),
+      Path.join(memory_root(), "preferences"),
+      Path.join(memory_root(), "traces"),
+      Path.join(memory_root(), "skills"),
+      Path.dirname(db_path()),
+      skills_root(),
+      cache_root(),
+      Path.join(cache_root(), "skills"),
+      tmp_root()
+    ]
+    |> Enum.each(&File.mkdir_p!/1)
+
+    home
+  end
+
+  @doc "Return the Settings Central root."
+  @spec settings_root() :: String.t()
+  def settings_root do
+    app_root(AllbertAssist.Settings) || configured(:settings_root) ||
+      env_path("ALLBERT_SETTINGS_ROOT") || Path.join(home(), "settings")
+  end
+
+  @doc "Return the markdown memory root."
+  @spec memory_root() :: String.t()
+  def memory_root do
+    app_root(AllbertAssist.Memory) || configured(:memory_root) ||
+      env_path("ALLBERT_MEMORY_ROOT") || Path.join(home(), "memory")
+  end
+
+  @doc "Return the local SQLite database path."
+  @spec db_path() :: String.t()
+  def db_path do
+    configured(:db_path) || env_path("DATABASE_PATH") ||
+      Path.join([home(), "db", "allbert.sqlite3"])
+  end
+
+  @doc "Return the user-owned Agent Skills root."
+  @spec skills_root() :: String.t()
+  def skills_root do
+    configured(:skills_root) || Path.join(home(), "skills")
+  end
+
+  @doc "Return the Allbert cache root."
+  @spec cache_root() :: String.t()
+  def cache_root do
+    configured(:cache_root) || Path.join(home(), "cache")
+  end
+
+  @doc "Return the Allbert temporary runtime root."
+  @spec tmp_root() :: String.t()
+  def tmp_root do
+    configured(:tmp_root) || Path.join(home(), "tmp")
+  end
+
+  defp configured(key) do
+    @app
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(key)
+    |> expand_if_present()
+  end
+
+  defp app_root(module) do
+    @app
+    |> Application.get_env(module, [])
+    |> Keyword.get(:root)
+    |> expand_if_present()
+  end
+
+  defp expand_if_present(nil), do: nil
+  defp expand_if_present(path) when is_binary(path), do: Path.expand(path)
+
+  defp env_path(key) do
+    key
+    |> System.get_env()
+    |> expand_if_present()
+  end
+end

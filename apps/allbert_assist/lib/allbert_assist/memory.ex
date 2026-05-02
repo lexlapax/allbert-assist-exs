@@ -35,17 +35,12 @@ defmodule AllbertAssist.Memory do
 
   1. `config :allbert_assist, AllbertAssist.Memory, root: "..."`
   2. `ALLBERT_MEMORY_ROOT`
-  3. `var/allbert/memory` under the current project
+  3. `<ALLBERT_HOME>/memory`, with `ALLBERT_HOME_DIR` as an accepted alias and
+     `~/.allbert` as the default home
   """
   @spec root() :: String.t()
   def root do
-    configured_root =
-      :allbert_assist
-      |> Application.get_env(__MODULE__, [])
-      |> Keyword.get(:root)
-
-    configured_root || System.get_env("ALLBERT_MEMORY_ROOT") ||
-      Path.expand("var/allbert/memory", File.cwd!())
+    AllbertAssist.Paths.memory_root()
   end
 
   @doc "Create the memory root and all initial category directories."

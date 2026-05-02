@@ -5,7 +5,7 @@ Phoenix web surface for Allbert Assist.
 Start the web demo:
 
 ```sh
-export ALLBERT_MEMORY_ROOT=/tmp/allbert-v001-demo
+export ALLBERT_HOME=/tmp/allbert-v001-demo
 export ALLBERT_TRACE_ENABLED=true
 mix phx.server
 ```

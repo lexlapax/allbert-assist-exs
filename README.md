@@ -6,7 +6,7 @@ IEx, or LiveView; route it through Jido signals and a primary intent agent; run
 validated actions; persist markdown memory; and write inspectable traces when
 enabled.
 
-## v0.01 Capabilities
+## Current Capabilities
 
 - Signal-first runtime boundary: `AllbertAssist.Runtime.submit_user_input/1`
 - Primary intent agent: `AllbertAssist.Agents.IntentAgent`
@@ -14,7 +14,10 @@ enabled.
   planning, and external-network recognition
 - Permission gate for read-only work, memory writes, command planning, command
   execution denial, and external-network confirmation
-- Markdown memory under `ALLBERT_MEMORY_ROOT` or `var/allbert/memory`
+- Allbert Home path foundation under `ALLBERT_HOME`, alias
+  `ALLBERT_HOME_DIR`, defaulting to `~/.allbert`
+- Markdown memory under `<ALLBERT_HOME>/memory`, with `ALLBERT_MEMORY_ROOT` as
+  a specific override
 - Low-risk personal preference heuristics, such as "my name is Sandeep" and
   "I prefer short updates"
 - Markdown traces under the memory `traces` category when tracing is enabled
@@ -64,9 +67,9 @@ ignores are reported.
 Use a disposable memory root:
 
 ```sh
-export ALLBERT_MEMORY_ROOT=/tmp/allbert-v001-demo
+export ALLBERT_HOME=/tmp/allbert-v001-demo
 export ALLBERT_TRACE_ENABLED=true
-rm -rf "$ALLBERT_MEMORY_ROOT"
+rm -rf "$ALLBERT_HOME"
 ```
 
 Ask Allbert to remember something:
@@ -90,7 +93,7 @@ mix allbert.ask --trace "run a destructive shell command"
 Inspect generated files:
 
 ```sh
-find "$ALLBERT_MEMORY_ROOT" -maxdepth 2 -type f | sort
+find "$ALLBERT_HOME/memory" -maxdepth 2 -type f | sort
 ```
 
 ## Browser Demo
@@ -98,7 +101,7 @@ find "$ALLBERT_MEMORY_ROOT" -maxdepth 2 -type f | sort
 Start Phoenix:
 
 ```sh
-export ALLBERT_MEMORY_ROOT=/tmp/allbert-v001-demo
+export ALLBERT_HOME=/tmp/allbert-v001-demo
 export ALLBERT_TRACE_ENABLED=true
 mix phx.server
 ```
@@ -114,6 +117,8 @@ status, signal id, and trace path when tracing is enabled.
 
 ## Runtime Configuration
 
+- `ALLBERT_HOME`: root for Allbert runtime data; defaults to `~/.allbert`
+- `ALLBERT_HOME_DIR`: compatibility alias for `ALLBERT_HOME`
 - `ALLBERT_MEMORY_ROOT`: root for markdown memory and traces
 - `ALLBERT_TRACE_ENABLED=true`: enable trace recording
 - `OLLAMA_BASE_URL`: OpenAI-compatible Ollama base URL

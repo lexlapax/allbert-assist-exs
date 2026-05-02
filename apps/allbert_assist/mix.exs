@@ -43,6 +43,8 @@ defmodule AllbertAssist.MixProject do
       {:jason, "~> 1.2"},
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
+      {:yaml_elixir, "~> 2.12"},
+      {:ymlr, "~> 5.0"},
       # Jido agent framework + ecosystem
       {:jido, "~> 2.2"},
       {:jido_action, "~> 2.2"},
