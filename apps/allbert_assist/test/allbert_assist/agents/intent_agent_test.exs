@@ -3,9 +3,11 @@ defmodule AllbertAssist.Agents.IntentAgentTest do
 
   alias AllbertAssist.Agents.IntentAgent
   alias AllbertAssist.Memory
+  alias AllbertAssist.Settings
 
   setup do
     original_config = Application.get_env(:allbert_assist, Memory)
+    original_settings_config = Application.get_env(:allbert_assist, Settings)
 
     root =
       Path.join(
@@ -14,12 +16,19 @@ defmodule AllbertAssist.Agents.IntentAgentTest do
       )
 
     Application.put_env(:allbert_assist, Memory, root: root)
+    Application.put_env(:allbert_assist, Settings, root: Path.join(root, "settings"))
 
     on_exit(fn ->
       if original_config do
         Application.put_env(:allbert_assist, Memory, original_config)
       else
         Application.delete_env(:allbert_assist, Memory)
+      end
+
+      if original_settings_config do
+        Application.put_env(:allbert_assist, Settings, original_settings_config)
+      else
+        Application.delete_env(:allbert_assist, Settings)
       end
 
       File.rm_rf!(root)
@@ -38,8 +47,76 @@ defmodule AllbertAssist.Agents.IntentAgentTest do
              "list_skills",
              "read_skill",
              "plan_shell_command",
-             "external_network_request"
+             "external_network_request",
+             "list_settings",
+             "read_setting",
+             "update_setting",
+             "explain_setting",
+             "list_provider_profiles",
+             "set_provider_credential"
            ]
+  end
+
+  test "routes explicit settings prompts to settings actions" do
+    assert {:ok, list_response} =
+             IntentAgent.respond(%{
+               text: "show settings",
+               channel: :test,
+               operator_id: "local",
+               input_signal_id: "sig-settings"
+             })
+
+    assert list_response.status == :completed
+    assert list_response.message =~ "operator.timezone"
+    assert [%{name: "list_settings"}] = list_response.actions
+
+    assert {:ok, read_response} =
+             IntentAgent.respond(%{
+               text: "what is my timezone setting?",
+               channel: :test,
+               operator_id: "local",
+               input_signal_id: "sig-read-setting"
+             })
+
+    assert read_response.status == :completed
+    assert read_response.message =~ "operator.timezone"
+    assert [%{name: "read_setting"}] = read_response.actions
+  end
+
+  test "routes safe setting updates and provider credential prompts safely" do
+    assert {:ok, update_response} =
+             IntentAgent.respond(%{
+               text: "set my communication style to balanced",
+               channel: :test,
+               operator_id: "local",
+               input_signal_id: "sig-update-setting"
+             })
+
+    assert update_response.status == :completed
+    assert update_response.message =~ "Updated operator.communication_style"
+    assert [%{name: "update_setting"}] = update_response.actions
+
+    assert {:ok, guidance} =
+             IntentAgent.respond(%{
+               text: "configure my OpenAI API key",
+               channel: :test,
+               operator_id: "local",
+               input_signal_id: "sig-provider-key"
+             })
+
+    assert guidance.status == :completed
+    assert guidance.message =~ "explicit CLI or LiveView secret form"
+
+    assert {:ok, refused} =
+             IntentAgent.respond(%{
+               text: "set my OpenAI API key to test-key",
+               channel: :test,
+               operator_id: "local",
+               input_signal_id: "sig-provider-key-raw"
+             })
+
+    assert refused.status == :denied
+    assert refused.message =~ "will not store provider credentials"
   end
 
   test "answers capability prompts with safe v0.01 capabilities" do

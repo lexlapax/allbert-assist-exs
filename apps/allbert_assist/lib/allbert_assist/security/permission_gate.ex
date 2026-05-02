@@ -12,11 +12,21 @@ defmodule AllbertAssist.Security.PermissionGate do
     :memory_write,
     :command_plan,
     :command_execute,
-    :external_network
+    :external_network,
+    :settings_write,
+    :settings_secret_write,
+    :settings_secret_read
   ]
 
   @type permission ::
-          :read_only | :memory_write | :command_plan | :command_execute | :external_network
+          :read_only
+          | :memory_write
+          | :command_plan
+          | :command_execute
+          | :external_network
+          | :settings_write
+          | :settings_secret_write
+          | :settings_secret_read
 
   @type decision :: %{
           permission: permission() | atom(),
@@ -62,6 +72,26 @@ defmodule AllbertAssist.Security.PermissionGate do
       :external_network,
       :needs_confirmation,
       "External network access requires an explicit future confirmation flow."
+    )
+  end
+
+  def authorize(:settings_write, _context) do
+    decision(:settings_write, :allowed, "Safe Settings Central writes are allowed locally.")
+  end
+
+  def authorize(:settings_secret_write, _context) do
+    decision(
+      :settings_secret_write,
+      :allowed,
+      "Provider credentials may be configured through explicit credential flows."
+    )
+  end
+
+  def authorize(:settings_secret_read, _context) do
+    decision(
+      :settings_secret_read,
+      :denied,
+      "Raw secret display is not available from user-facing settings surfaces."
     )
   end
 

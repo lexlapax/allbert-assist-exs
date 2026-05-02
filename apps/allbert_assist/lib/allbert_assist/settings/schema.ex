@@ -287,7 +287,9 @@ defmodule AllbertAssist.Settings.Schema do
   end
 
   def sensitive_key?(key) do
-    String.contains?(key, ["secret", "token", "password", "api_key", "private_key", "credential"])
+    key
+    |> String.split(~r/[._-]/, trim: true)
+    |> Enum.any?(&(&1 in ["secret", "token", "password", "api", "key", "private", "credential"]))
   end
 
   defp validate_known_key_value(key, value, settings) do

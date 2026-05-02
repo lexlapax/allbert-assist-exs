@@ -22,7 +22,13 @@ defmodule AllbertAssist.Agents.IntentAgent do
       AllbertAssist.Actions.Intent.ListSkills,
       AllbertAssist.Actions.Intent.ReadSkill,
       AllbertAssist.Actions.Intent.PlanShellCommand,
-      AllbertAssist.Actions.Intent.ExternalNetworkRequest
+      AllbertAssist.Actions.Intent.ExternalNetworkRequest,
+      AllbertAssist.Actions.Settings.ListSettings,
+      AllbertAssist.Actions.Settings.ReadSetting,
+      AllbertAssist.Actions.Settings.UpdateSetting,
+      AllbertAssist.Actions.Settings.ExplainSetting,
+      AllbertAssist.Actions.Settings.ListProviderProfiles,
+      AllbertAssist.Actions.Settings.SetProviderCredential
     ],
     system_prompt: """
     You are Allbert's primary v0.01 intent agent.
@@ -51,6 +57,12 @@ defmodule AllbertAssist.Agents.IntentAgent do
   alias AllbertAssist.Actions.Intent.PlanShellCommand
   alias AllbertAssist.Actions.Intent.ReadRecentMemory
   alias AllbertAssist.Actions.Intent.ReadSkill
+  alias AllbertAssist.Actions.Settings.ExplainSetting
+  alias AllbertAssist.Actions.Settings.ListProviderProfiles
+  alias AllbertAssist.Actions.Settings.ListSettings
+  alias AllbertAssist.Actions.Settings.ReadSetting
+  alias AllbertAssist.Actions.Settings.SetProviderCredential
+  alias AllbertAssist.Actions.Settings.UpdateSetting
 
   @doc """
   Respond to one normalized runtime request.
@@ -81,7 +93,13 @@ defmodule AllbertAssist.Agents.IntentAgent do
       ListSkills,
       ReadSkill,
       PlanShellCommand,
-      ExternalNetworkRequest
+      ExternalNetworkRequest,
+      ListSettings,
+      ReadSetting,
+      UpdateSetting,
+      ExplainSetting,
+      ListProviderProfiles,
+      SetProviderCredential
     ]
   end
 
@@ -89,6 +107,7 @@ defmodule AllbertAssist.Agents.IntentAgent do
     normalized = String.downcase(text)
 
     [
+      fn -> settings_route(text, normalized) end,
       fn -> command_route(normalized) end,
       fn -> external_network_route(normalized) end,
       fn -> explicit_memory_route(normalized) end,
@@ -127,6 +146,61 @@ defmodule AllbertAssist.Agents.IntentAgent do
 
   defp capability_route(text), do: if(capability_request?(text), do: :list_skills)
 
+  defp settings_route(text, normalized) do
+    [
+      fn -> basic_settings_route(normalized) end,
+      fn -> setting_read_route(text, normalized) end,
+      fn -> setting_write_route(text) end,
+      fn -> provider_credential_route(text) end
+    ]
+    |> Enum.find_value(& &1.())
+  end
+
+  defp basic_settings_route(normalized) when normalized in ["show settings", "list settings"],
+    do: :list_settings
+
+  defp basic_settings_route(normalized) do
+    if String.contains?(normalized, "show provider profiles"), do: :list_provider_profiles
+  end
+
+  defp setting_read_route(text, normalized) do
+    cond do
+      Regex.match?(~r/^\s*explain\s+[a-z0-9_.]+\s*$/i, text) ->
+        {:explain_setting, text |> String.replace(~r/^\s*explain\s+/i, "") |> String.trim()}
+
+      String.contains?(normalized, "timezone setting") ->
+        {:read_setting, "operator.timezone"}
+
+      Regex.match?(~r/^\s*what\s+is\s+my\s+.+\s+setting\??\s*$/i, text) ->
+        {:read_setting, setting_key_from_question(text)}
+
+      true ->
+        nil
+    end
+  end
+
+  defp setting_write_route(text) do
+    if Regex.match?(~r/^\s*set\s+my\s+communication\s+style\s+to\s+.+/i, text) do
+      {:update_setting, "operator.communication_style", value_after_to(text)}
+    end
+  end
+
+  defp provider_credential_route(text) do
+    cond do
+      Regex.match?(~r/^\s*configure\s+my\s+openai\s+api\s+key/i, text) ->
+        {:set_provider_credential, "openai", :configure}
+
+      Regex.match?(~r/^\s*set\s+my\s+openai\s+api\s+key\s+to\s+.+/i, text) ->
+        {:set_provider_credential, "openai", :raw_prompt_secret}
+
+      Regex.match?(~r/^\s*show\s+my\s+openai\s+api\s+key/i, text) ->
+        {:set_provider_credential, "openai", :raw_secret_read}
+
+      true ->
+        nil
+    end
+  end
+
   defp run_route(:plan_shell_command, text, context) do
     PlanShellCommand.run(%{command: requested_command(text), source_text: text}, context)
   end
@@ -153,6 +227,30 @@ defmodule AllbertAssist.Agents.IntentAgent do
 
   defp run_route(:list_skills, _text, context) do
     ListSkills.run(%{}, context)
+  end
+
+  defp run_route(:list_settings, _text, context) do
+    ListSettings.run(%{}, context)
+  end
+
+  defp run_route({:read_setting, key}, _text, context) do
+    ReadSetting.run(%{key: key}, context)
+  end
+
+  defp run_route({:explain_setting, key}, _text, context) do
+    ExplainSetting.run(%{key: key}, context)
+  end
+
+  defp run_route({:update_setting, key, value}, _text, context) do
+    UpdateSetting.run(%{key: key, value: value}, context)
+  end
+
+  defp run_route(:list_provider_profiles, _text, context) do
+    ListProviderProfiles.run(%{}, context)
+  end
+
+  defp run_route({:set_provider_credential, provider, mode}, _text, context) do
+    SetProviderCredential.run(%{provider: provider, mode: mode}, context)
   end
 
   defp run_route(:direct_answer, text, context) do
@@ -279,6 +377,23 @@ defmodule AllbertAssist.Agents.IntentAgent do
     |> String.replace(~r/^\s*(please\s+)?remember\s+(that\s+)?/i, "")
     |> String.replace(~r/^\s*(save|store|note)\s+(this|that)\s*/i, "")
     |> String.trim()
+  end
+
+  defp setting_key_from_question(text) do
+    normalized = String.downcase(text)
+
+    cond do
+      String.contains?(normalized, "timezone") -> "operator.timezone"
+      String.contains?(normalized, "communication style") -> "operator.communication_style"
+      true -> "operator.#{normalized |> String.replace(~r/[^a-z0-9]+/, "_") |> String.trim("_")}"
+    end
+  end
+
+  defp value_after_to(text) do
+    text
+    |> String.replace(~r/^.*\bto\s+/i, "")
+    |> String.trim()
+    |> String.trim_trailing(".")
   end
 
   defp personal_memory(text) do

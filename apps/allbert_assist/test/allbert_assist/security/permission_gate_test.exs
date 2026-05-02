@@ -9,7 +9,10 @@ defmodule AllbertAssist.Security.PermissionGateTest do
              :memory_write,
              :command_plan,
              :command_execute,
-             :external_network
+             :external_network,
+             :settings_write,
+             :settings_secret_write,
+             :settings_secret_read
            ]
   end
 
@@ -43,5 +46,23 @@ defmodule AllbertAssist.Security.PermissionGateTest do
     assert decision.requires_confirmation
     refute PermissionGate.allowed?(decision)
     assert PermissionGate.response_status(decision) == :needs_confirmation
+  end
+
+  test "allows safe settings writes and explicit secret writes" do
+    for permission <- [:settings_write, :settings_secret_write] do
+      decision = PermissionGate.authorize(permission, %{})
+
+      assert decision.permission == permission
+      assert decision.decision == :allowed
+      assert PermissionGate.allowed?(decision)
+    end
+  end
+
+  test "denies raw user-facing secret reads" do
+    decision = PermissionGate.authorize(:settings_secret_read, %{})
+
+    assert decision.permission == :settings_secret_read
+    assert decision.decision == :denied
+    refute PermissionGate.allowed?(decision)
   end
 end
