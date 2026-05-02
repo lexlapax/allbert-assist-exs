@@ -125,8 +125,7 @@ network adapters arrive, and no scripting dependency should be added yet.
 Plan: `docs/plans/v0.02-plan.md`
 Request flow: `docs/plans/v0.02-request-flow.md`
 
-Status: in progress. Milestone 1 is complete; Milestones 2-7 are
-implementation-ready after the doc hardening pass.
+Status: complete.
 
 Expected direction:
 

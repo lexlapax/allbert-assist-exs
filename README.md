@@ -1,10 +1,11 @@
 # Allbert Assist
 
 Allbert Assist is a Phoenix umbrella app for a local, Jido-centered personal
-assistant runtime. v0.01 proves the first usable loop: submit a prompt from CLI,
-IEx, or LiveView; route it through Jido signals and a primary intent agent; run
-validated actions; persist markdown memory; and write inspectable traces when
-enabled.
+assistant runtime. v0.02 proves the first usable local control plane: submit a
+prompt from CLI or LiveView; route it through Jido signals and a primary intent
+agent; run validated actions; persist markdown memory; write inspectable
+traces; and manage typed settings, provider profiles, and encrypted local
+secrets through Settings Central.
 
 ## Current Capabilities
 
@@ -13,16 +14,22 @@ enabled.
 - Explicit Jido actions for direct answers, memory, skill inspection, command
   planning, and external-network recognition
 - Permission gate for read-only work, memory writes, command planning, command
-  execution denial, and external-network confirmation
+  execution denial, external-network confirmation, settings writes, and
+  settings secret boundaries
 - Allbert Home path foundation under `ALLBERT_HOME`, alias
   `ALLBERT_HOME_DIR`, defaulting to `~/.allbert`
+- Settings Central under `<ALLBERT_HOME>/settings`, with typed YAML settings,
+  encrypted `secrets.yml.enc`, and append-only audit markdown
+- Provider and model profiles with redacted credential status
 - Markdown memory under `<ALLBERT_HOME>/memory`, with `ALLBERT_MEMORY_ROOT` as
   a specific override
 - Low-risk personal preference heuristics, such as "my name is Sandeep" and
   "I prefer short updates"
 - Markdown traces under the memory `traces` category when tracing is enabled
 - CLI entrypoint with `mix allbert.ask`
-- Phoenix LiveView at `http://localhost:4000/agent`
+- Settings CLI with `mix allbert.settings`
+- Phoenix LiveViews at `http://localhost:4000/agent` and
+  `http://localhost:4000/settings`
 
 ## Requirements
 
@@ -90,6 +97,16 @@ Confirm command execution is blocked:
 mix allbert.ask --trace "run a destructive shell command"
 ```
 
+Inspect and update Settings Central:
+
+```sh
+mix allbert.settings list
+mix allbert.settings set operator.communication_style concise
+mix allbert.settings explain operator.communication_style
+printf 'test-key\n' | mix allbert.settings providers set-key openai
+mix allbert.settings providers list
+```
+
 Inspect generated files:
 
 ```sh
@@ -110,15 +127,17 @@ Open:
 
 ```text
 http://localhost:4000/agent
+http://localhost:4000/settings
 ```
 
-The LiveView uses the same runtime boundary as the CLI and displays response
-status, signal id, and trace path when tracing is enabled.
+The LiveViews use the same runtime and settings boundaries as the CLI.
 
 ## Runtime Configuration
 
 - `ALLBERT_HOME`: root for Allbert runtime data; defaults to `~/.allbert`
 - `ALLBERT_HOME_DIR`: compatibility alias for `ALLBERT_HOME`
+- `ALLBERT_SETTINGS_ROOT`: specific override for Settings Central
+- `ALLBERT_SETTINGS_MASTER_KEY`: base64-encoded 32-byte secret-store key
 - `ALLBERT_MEMORY_ROOT`: root for markdown memory and traces
 - `ALLBERT_TRACE_ENABLED=true`: enable trace recording
 - `OLLAMA_BASE_URL`: OpenAI-compatible Ollama base URL
@@ -130,15 +149,19 @@ status, signal id, and trace path when tracing is enabled.
 - Roadmap: `docs/plans/roadmap.md`
 - v0.01 plan: `docs/plans/v0.01-plan.md`
 - v0.01 request flow: `docs/plans/v0.01-request-flow.md`
+- v0.02 plan: `docs/plans/v0.02-plan.md`
+- v0.02 request flow: `docs/plans/v0.02-request-flow.md`
 - ADRs: `docs/adr/`
 
 ## Safety Boundaries
 
-v0.01 is local and conservative:
+Allbert remains local and conservative:
 
 - It does not execute shell commands.
 - It does not make external network calls.
 - Sensitive-looking personal data is not silently stored unless explicit memory
   intent is present.
+- Raw provider credentials are never displayed and are stored only in the
+  encrypted Settings Central secret store.
 - Side effects go through named actions with permission decisions and optional
   trace records.
