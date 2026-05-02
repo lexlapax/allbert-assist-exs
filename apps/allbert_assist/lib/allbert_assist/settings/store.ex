@@ -1,0 +1,96 @@
+defmodule AllbertAssist.Settings.Store do
+  @moduledoc false
+
+  alias AllbertAssist.Paths
+  alias AllbertAssist.Settings.Schema
+  alias AllbertAssist.Settings.YamlCodec
+
+  @app :allbert_assist
+
+  def root, do: Paths.settings_root()
+
+  def settings_path, do: Path.join(root(), "settings.yml")
+
+  def ensure_root! do
+    root = root()
+    File.mkdir_p!(root)
+    File.mkdir_p!(Path.join(root, "audit"))
+    root
+  end
+
+  def read_user_settings do
+    path = settings_path()
+
+    if File.exists?(path) do
+      YamlCodec.read_file(path)
+    else
+      {:ok, %{}}
+    end
+  end
+
+  def write_user_settings(settings, opts \\ []) when is_map(settings) and is_list(opts) do
+    with {:ok, merged} <- merge_user_settings(settings),
+         :ok <- Schema.validate_settings(merged) do
+      ensure_root!()
+      write_atomic(settings_path(), YamlCodec.encode!(settings))
+      {:ok, settings}
+    end
+  rescue
+    exception ->
+      {:error, {:settings_write_failed, {exception.__struct__, Exception.message(exception)}}}
+  end
+
+  def resolved_settings do
+    with {:ok, user_settings} <- read_user_settings(),
+         {:ok, merged} <- merge_user_settings(user_settings),
+         :ok <- Schema.validate_settings(merged) do
+      {:ok, merged, user_settings}
+    end
+  end
+
+  def put_user_setting(key, value) do
+    with {:ok, user_settings} <- read_user_settings(),
+         {:ok, merged} <- merge_user_settings(user_settings),
+         :ok <- Schema.validate_key_value(key, value, merged) do
+      updated_user_settings = Schema.put_dotted(user_settings, key, value)
+      updated_merged = Schema.put_dotted(merged, key, value)
+
+      with :ok <- Schema.validate_settings(updated_merged),
+           {:ok, _settings} <- write_user_settings(updated_user_settings) do
+        {:ok, updated_merged, updated_user_settings}
+      end
+    end
+  end
+
+  def merge_user_settings(user_settings) when is_map(user_settings) do
+    {:ok, deep_merge(Schema.defaults(), user_settings)}
+  end
+
+  def write_atomic(path, content) when is_binary(path) and is_binary(content) do
+    path |> Path.dirname() |> File.mkdir_p!()
+    tmp_path = "#{path}.tmp-#{System.unique_integer([:positive])}"
+
+    with :ok <- File.write(tmp_path, content),
+         :ok <- File.rename(tmp_path, path) do
+      :ok
+    else
+      {:error, reason} = error ->
+        File.rm(tmp_path)
+        {:error, {:settings_write_failed, reason(error, reason)}}
+    end
+  end
+
+  def app_config do
+    Application.get_env(@app, AllbertAssist.Settings, [])
+  end
+
+  defp deep_merge(left, right) when is_map(left) and is_map(right) do
+    Map.merge(left, right, fn _key, left_value, right_value ->
+      deep_merge(left_value, right_value)
+    end)
+  end
+
+  defp deep_merge(_left, right), do: right
+
+  defp reason(error, _reason), do: error
+end

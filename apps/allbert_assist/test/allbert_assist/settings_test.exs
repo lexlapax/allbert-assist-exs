@@ -1,0 +1,156 @@
+defmodule AllbertAssist.SettingsTest do
+  use ExUnit.Case, async: false
+
+  alias AllbertAssist.Paths
+  alias AllbertAssist.Settings
+  alias AllbertAssist.Settings.Secrets
+
+  @env_vars [
+    "ALLBERT_HOME",
+    "ALLBERT_HOME_DIR",
+    "ALLBERT_SETTINGS_ROOT",
+    "ALLBERT_SETTINGS_MASTER_KEY"
+  ]
+
+  setup do
+    original_env = Map.new(@env_vars, &{&1, System.get_env(&1)})
+    original_paths_config = Application.get_env(:allbert_assist, Paths)
+    original_settings_config = Application.get_env(:allbert_assist, Settings)
+
+    Enum.each(@env_vars, &System.delete_env/1)
+    Application.delete_env(:allbert_assist, Paths)
+    Application.delete_env(:allbert_assist, Settings)
+
+    home = temp_path("home")
+    System.put_env("ALLBERT_HOME", home)
+
+    on_exit(fn ->
+      File.rm_rf!(home)
+      restore_env(original_env)
+      restore_app_env(Paths, original_paths_config)
+      restore_app_env(Settings, original_settings_config)
+    end)
+
+    {:ok, home: home}
+  end
+
+  test "root derives from Allbert Home and creates settings folders", %{home: home} do
+    assert Settings.root() == Path.join(home, "settings")
+    assert Settings.ensure_root!() == Path.join(home, "settings")
+    assert File.dir?(Path.join([home, "settings", "audit"]))
+  end
+
+  test "missing settings file resolves defaults" do
+    assert {:ok, "America/Los_Angeles"} = Settings.get("operator.timezone")
+    assert {:ok, resolved} = Settings.explain("operator.timezone")
+    assert resolved.source == :default
+    assert resolved.writable?
+  end
+
+  test "safe write stores only operator override and survives reread", %{home: home} do
+    assert {:ok, resolved} =
+             Settings.put("operator.communication_style", "detailed", %{
+               actor: "local",
+               channel: :test
+             })
+
+    assert resolved.source == :operator
+    assert {:ok, "detailed"} = Settings.get("operator.communication_style")
+
+    assert {:ok, yaml} = File.read(Path.join([home, "settings", "settings.yml"]))
+    assert yaml =~ "communication_style: detailed"
+    refute yaml =~ "model_profiles:"
+  end
+
+  test "invalid yaml returns a structured parse error", %{home: home} do
+    settings_path = Path.join([home, "settings", "settings.yml"])
+    File.mkdir_p!(Path.dirname(settings_path))
+    File.write!(settings_path, "operator: [")
+
+    assert {:error, {:settings_parse_failed, _reason}} = Settings.get("operator.timezone")
+  end
+
+  test "invalid values and read-only keys are rejected" do
+    assert {:error, {:invalid_setting, "operator.communication_style", _reason}} =
+             Settings.put("operator.communication_style", "purple", %{})
+
+    assert {:error, {:read_only_setting, "agents.primary_intent.module"}} =
+             Settings.put("agents.primary_intent.module", "Other.Module", %{})
+
+    assert {:error, {:unknown_setting, "nope.value"}} =
+             Settings.put("nope.value", "x", %{})
+  end
+
+  test "provider and model profiles resolve with redacted credential status" do
+    assert {:ok, providers} = Settings.list_provider_profiles()
+    assert Enum.any?(providers, &(&1.name == "openai" and &1.credential_status == :missing))
+
+    assert {:ok, profile} = Settings.resolve_model_profile("fast")
+    assert profile.provider == "openai"
+    assert profile.credential_status == :missing
+    refute Map.has_key?(profile, :api_key)
+  end
+
+  test "secret writes encrypt raw value and store only secret ref in settings", %{home: home} do
+    assert {:ok, %{status: :configured}} =
+             Secrets.put_secret("secret://providers/openai/api_key", "test-key", %{
+               actor: "local",
+               channel: :test
+             })
+
+    assert {:ok, "test-key"} = Secrets.get_secret("secret://providers/openai/api_key")
+    assert {:ok, providers} = Settings.list_provider_profiles()
+    openai = Enum.find(providers, &(&1.name == "openai"))
+    assert openai.credential_status == :configured
+
+    settings_yaml = File.read!(Path.join([home, "settings", "settings.yml"]))
+    secrets_yaml = File.read!(Path.join([home, "settings", "secrets.yml.enc"]))
+
+    assert settings_yaml =~ "secret://providers/openai/api_key"
+    assert secrets_yaml =~ "aes-256-gcm"
+    refute settings_yaml =~ "test-key"
+    refute secrets_yaml =~ "test-key"
+  end
+
+  test "bad secret refs and corrupt encrypted payloads return structured errors", %{home: home} do
+    assert {:error, {:invalid_secret_ref, "secret://bad"}} =
+             Secrets.put_secret("secret://bad", "test-key", %{})
+
+    secrets_path = Path.join([home, "settings", "secrets.yml.enc"])
+    File.mkdir_p!(Path.dirname(secrets_path))
+    File.write!(secrets_path, "not: valid-envelope\n")
+
+    assert {:error, {:secret_decrypt_failed, _reason}} =
+             Secrets.get_secret("secret://providers/openai/api_key")
+  end
+
+  test "invalid master key source does not create encrypted file", %{home: home} do
+    System.put_env("ALLBERT_SETTINGS_MASTER_KEY", Base.encode64("too-short"))
+
+    assert {:error, {:invalid_settings_master_key, :env}} =
+             Secrets.put_secret("secret://providers/openai/api_key", "test-key", %{})
+
+    refute File.exists?(Path.join([home, "settings", "secrets.yml.enc"]))
+  end
+
+  test "ALLBERT_SETTINGS_ROOT overrides the derived settings root" do
+    settings_root = temp_path("settings")
+    System.put_env("ALLBERT_SETTINGS_ROOT", settings_root)
+
+    assert Settings.root() == settings_root
+  end
+
+  defp temp_path(name) do
+    Path.join(System.tmp_dir!(), "allbert-settings-#{name}-#{System.unique_integer([:positive])}")
+  end
+
+  defp restore_env(original_env) do
+    Enum.each(original_env, fn
+      {key, nil} -> System.delete_env(key)
+      {key, value} -> System.put_env(key, value)
+    end)
+  end
+
+  defp restore_app_env(module, nil), do: Application.delete_env(:allbert_assist, module)
+  defp restore_app_env(module, value), do: Application.put_env(:allbert_assist, module, value)
+end
